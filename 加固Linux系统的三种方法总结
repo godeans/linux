@@ -1,0 +1,87 @@
+加固Linux系统的三种方法总结
+
+通过配置系统环境变量实现记录用户在命令行执行的命令。
+
+vim /etc/profile.d/system_monitor.sh
+# 添加下面代码
+export TMOUT=600
+readonly TMOUT
+#history
+USER_IP=`who -u am i 2>/dev/null | awk '{print $NF}' | sed -e 's/[()]//g'`
+HISTDIR=/usr/share/.history
+if [ -z $USER_IP ]; then
+USER_IP=`hostname`
+fi
+if [ ! -d $HISTDIR ]; then
+mkdir -p $HISTDIR
+chmod 777 $HISTDIR
+fi
+if [ ! -d $HISTDIR/${LOGNAME} ]; then
+mkdir -p $HISTDIR/${LOGNAME}
+chmod 300 $HISTDIR/${LOGNAME}
+fi
+export HISTSIZE=4000
+DT=`date +%Y%m%d_%H%M%S`
+export HISTFILE="$HISTDIR/${LOGNAME}/${USER_IP}.history.$DT"
+export HISTTIMEFORMAT="[%Y.%m.%d %H:%M:%S]"
+chmod 600 $HISTFILE/${LOGNAME}/*.history* 2>/dev/null
+
+重新加载环境变量
+
+1
+source /etc/profile.d/system_monitor.sh
+效果：每个帐号每次的登录IP以及运行命令都会记录在该目录如下：
+
+[root@localhost ~]# ll /usr/share/.history/root/
+total 8
+-rw-------. 1 root root 236 Apr 23 21:49 1.180.212.137.history.20170423_214918
+-rw-------. 1 root root 564 Apr 23 21:54 1.180.212.137.history.20170423_214957
+crond调用黑白名单
+
+Cron有它自己内建的特性，这特性允许定义哪些人能哪些人不能跑任务。 这是通过两个文件/etc/cron.allow 和 /etc/cron.deny控制的。要锁定在用Cron的用户时可以简单的将其名字写到corn.deny里，而要允许用户跑cron时将其名字加到cron.allow即可。如果你要禁止所有用户，仅允许root用户。如下：
+
+1
+2
+# echo 'root' >> /etc/cron.allow
+# echo 'ALL' >> /etc/cron.deny
+ssh服务禁止root登录
+
+1、不要使用默认端口，修改方式；
+
+1
+Port 3714
+2、不要使用第一版协议；
+
+1
+Protocol 2
+3、限制可登录的用户；
+
+1
+AllowUsers user1 user2 #仅允许user1和user2用户登录
+4、设定空闲会话超时时长；
+
+5、利用防火墙设置ssh的远程访问策略；仅允许来自于指定网络中的主机访问；
+
+6、仅监听于指定的IP地址；
+
+ListenAddress
+
+7、基于口令认证时，要使用强密码策略；
+
+1
+2
+# 使用mkpasswd命令生成密码；
+mkpasswd -l 15 -s 3 -d 3 -C 3
+8、最后使用基于密钥进行认证
+
+9、禁止使用空密码，默认启用；
+
+1
+PermitEmptyPasswords no：是否允许空密码登录；
+10、禁止管理员直接登录；
+
+1
+PermitRootLogin yes # 是否允许管理员直接登录；安全起见，建议为no；
+11、限制ssh访问频度和并发在线；
+
+12、做好日志分析；
